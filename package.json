@@ -46,7 +46,7 @@
 		"socket.io": "^4.8.1",
 		"sqlite3": "^5.1.7",
 		"totp-generator": "^0.0.14",
-		"@lazyneoaz/neokex-fca": "^0.0.2",
+		"@lazyneoaz/neokex-fca": "^0.0.3",
 		"yt-search": "^2.13.1"
 	},
 	"scripts": {
