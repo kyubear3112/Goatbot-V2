@@ -9,21 +9,13 @@ function decode(text) {
 	return text;
 }
 
-let gradient;
-try {
-	gradient = defaultRequire("gradient-string");
-}
-catch (e) {
-	gradient = () => (text => text);
-}
-if (typeof gradient !== "function")
-	gradient = () => (text => text);
+const gradient = defaultRequire("gradient-string");
 const axios = defaultRequire("axios");
 const path = defaultRequire("path");
 const readline = defaultRequire("readline");
 const fs = defaultRequire("fs-extra");
 const toptp = defaultRequire("totp-generator");
-const { login } = defaultRequire("@lazyneoaz/neokex-fca");
+const login = defaultRequire("neokex-fca");
 const qr = new (defaultRequire("qrcode-reader"));
 const Canvas = defaultRequire("canvas");
 const https = defaultRequire("https");
@@ -153,8 +145,6 @@ function createLine(content, isMaxWidth = false) {
 const character = createLine();
 
 const clearLines = (n) => {
-	if (typeof process.stdout.moveCursor != "function" || typeof process.stdout.clearLine != "function" || typeof process.stdout.cursorTo != "function")
-		return;
 	for (let i = 0; i < n; i++) {
 		const y = i === 0 ? null : -1;
 		process.stdout.moveCursor(0, y);
@@ -502,10 +492,9 @@ async function getAppStateToLogin(loginWithEmail) {
 					.filter(i => i.key && i.value && i.key != "x-referer");
 			}
 			if (!await checkLiveCookie(appState.map(i => i.key + "=" + i.value).join("; "), facebookAccount.userAgent)) {
-				// The lightweight liveness probe can report false negatives depending on
-				// the egress IP. Do not abort here: fall through and let the real login
-				// attempt below decide whether the cookies are actually valid.
-				log.warn("LOGIN FACEBOOK", "Cookie liveness pre-check failed, attempting real login anyway...");
+				const error = new Error("Cookie is invalid");
+				error.name = "COOKIE_INVALID";
+				throw error;
 			}
 		}
 	}
@@ -672,24 +661,7 @@ async function startBot(loginWithEmail) {
 
 		let isSendNotiErrorMessage = false;
 
-		// ——————————— PICK USER AGENT ——————————— //
-		// When randomUserAgent is enabled, choose one from the configured
-		// list for this login so the bot does not always look identical.
-		const optionsFca = { ...global.GoatBot.config.optionsFca };
-		if (optionsFca.randomUserAgent === true) {
-			const uaList = Array.isArray(facebookAccount.userAgents) ? facebookAccount.userAgents.filter(Boolean) : [];
-			if (uaList.length > 0) {
-				const chosenUA = uaList[Math.floor(Math.random() * uaList.length)];
-				optionsFca.userAgent = chosenUA;
-				facebookAccount.userAgent = chosenUA;
-				log.info("USER AGENT", `Using random user agent: ${chosenUA}`);
-			}
-			else {
-				log.warn("USER AGENT", "randomUserAgent is enabled but facebookAccount.userAgents is empty; using the default userAgent");
-			}
-		}
-
-		login({ appState }, optionsFca, async function (error, api) {
+		login({ appState }, global.GoatBot.config.optionsFca, async function (error, api) {
 			if (!isNaN(facebookAccount.intervalGetNewCookie) && facebookAccount.intervalGetNewCookie > 0)
 				if (facebookAccount.email && facebookAccount.password) {
 					spin?._stop();
@@ -918,10 +890,10 @@ async function startBot(loginWithEmail) {
 			log.master("NOTIFICATION", (notification || "").trim());
 			log.master("SUCCESS", getText('login', 'runBot'));
 			log.master("LOAD TIME", `${convertTime(Date.now() - global.GoatBot.startTime)}`);
-			logColor("#f5ab00", createLine("CREDITS"));
-			// —————————————————— CREDIT INFO —————————————————— //
-			console.log(`\x1b[1m\x1b[33m${("ORIGINAL AUTHOR:")}\x1b[0m\x1b[1m\x1b[37m \x1b[0m\x1b[1m\x1b[36m${("Project GoatBot v2 created by ntkhang03 (https://github.com/ntkhang03), please do not sell this source code or claim it as your own. Thank you!")}\x1b[0m`);
-			console.log(`\x1b[1m\x1b[33m${("MODIFIED BY:")}\x1b[0m\x1b[1m\x1b[37m \x1b[0m\x1b[1m\x1b[36m${("Modified and enhanced by Neoaz (@lazyneoaz) - https://github.com/lazyneoaz")}\x1b[0m`);
+			logColor("#f5ab00", createLine("COPYRIGHT"));
+			// —————————————————— COPYRIGHT INFO —————————————————— //
+			// console.log(`\x1b[1m\x1b[33mCOPYRIGHT:\x1b[0m\x1b[1m\x1b[37m \x1b[0m\x1b[1m\x1b[36mProject GoatBot v2 created by ntkhang03 (https://github.com/ntkhang03), please do not sell this source code or claim it as your own. Thank you!\x1b[0m`);
+			console.log(`\x1b[1m\x1b[33m${("COPYRIGHT:")}\x1b[0m\x1b[1m\x1b[37m \x1b[0m\x1b[1m\x1b[36m${("Project GoatBot v2 created by ntkhang03 (https://github.com/ntkhang03), please do not sell this source code or claim it as your own. Thank you!")}\x1b[0m`);
 			logColor("#f5ab00", character);
 			global.GoatBot.config.adminBot = adminBot;
 			writeFileSync(global.client.dirConfig, JSON.stringify(global.GoatBot.config, null, 2));
@@ -930,13 +902,6 @@ async function startBot(loginWithEmail) {
 			// ——————————————————————————————————————————————————— //
 			const { restartListenMqtt } = global.GoatBot.config;
 			let intervalCheckLiveCookieAndRelogin = false;
-			// the FCA library owns reconnect + recovery (auto-reconnect, MQTT health
-			// supervisor, cookie refresh and credential re-login). When that is
-			// enabled, the bot must NOT spin up its own competing listener or
-			// relogin loop on a transient close/refusal — that creates two
-			// sockets against the same account and trips Facebook's limits.
-			const fcaOwnsReconnect =
-				global.GoatBot.config.optionsFca?.autoReconnect !== false;
 			// —————————————————— CALLBACK LISTEN —————————————————— //
 			async function callBackListen(error, event) {
 				if (error) {
@@ -946,17 +911,9 @@ async function startBot(loginWithEmail) {
 						error.error == "Not logged in." ||
 						error.error == "Connection refused: Server unavailable"
 					) {
-						global.statusAccountBot = 'can\'t login';
-
-						// The listener is being rebuilt by the library's own recovery;
-						// do not notify repeatedly or start a second socket.
-						if (fcaOwnsReconnect) {
-							log.warn("LISTEN_MQTT", "the login library is recovering this socket automatically; deferring to it");
-							return;
-						}
-
 						log.err("NOT LOGGEG IN", getText('login', 'notLoggedIn'), error);
 						global.responseUptimeCurrent = responseUptimeError;
+						global.statusAccountBot = 'can\'t login';
 						if (!isSendNotiErrorMessage) {
 							await handlerWhenListenHasError({ api, threadModel, userModel, dashBoardModel, globalModel, threadsData, usersData, dashBoardData, globalData, error });
 							isSendNotiErrorMessage = true;
@@ -1132,7 +1089,7 @@ async function startBot(loginWithEmail) {
 				const app = express();
 				const server = http.createServer(app);
 				const { data: html } = await axios.get("https://raw.githubusercontent.com/ntkhang03/resources-goat-bot/master/homepage/home.html");
-				const PORT = process.env.PORT || global.GoatBot.config.dashBoard?.port || (!isNaN(global.GoatBot.config.serverUptime.port) && global.GoatBot.config.serverUptime.port) || 3001;
+				const PORT = global.GoatBot.config.dashBoard?.port || (!isNaN(global.GoatBot.config.serverUptime.port) && global.GoatBot.config.serverUptime.port) || 3001;
 				app.get('/', (req, res) => res.send(html));
 				app.get('/uptime', global.responseUptimeCurrent);
 				let nameUpTime;
@@ -1170,7 +1127,7 @@ async function startBot(loginWithEmail) {
 					}
 					try {
 						await stopListening();
-						await sleep(1000);
+						await sleep(Number(restartListenMqtt.delayAfterStopListening) > 0 ? Number(restartListenMqtt.delayAfterStopListening) : 1000);
 						global.GoatBot.Listening = api.listenMqtt(createCallBackListen());
 						log.info("LISTEN_MQTT", getText('login', 'restartListenMessage2'));
 					}

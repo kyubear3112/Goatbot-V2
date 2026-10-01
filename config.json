@@ -6,60 +6,19 @@
     "i_user": "",
     "proxy": null,
     "userAgent": "Mozilla/5.0 (Linux; Android 12; M2102J20SG) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/101.0.0.0 Mobile Safari/537.36",
-    "userAgents": [
-      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
-      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
-      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Safari/605.1.15",
-      "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
-      "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:126.0) Gecko/20100101 Firefox/126.0",
-      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:126.0) Gecko/20100101 Firefox/126.0",
-      "Mozilla/5.0 (Linux; Android 14; SM-S921B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Mobile Safari/537.36",
-      "Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36",
-      "Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Mobile/15E148 Safari/604.1",
-      "Mozilla/5.0 (iPad; CPU OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Mobile/15E148 Safari/604.1"
-    ],
     "intervalGetNewCookie": 1440,
-    "notes": "time the system automatically retrieves new cookies from email/password, unit is minute, if you set null, the system will not automatically retrieve new cookies, it saves you from having to manually change your cookie every time it expires. recommended set to 1440 (1day) or 4320 (3day).TO BE ABLE TO USE THIS FEATURE YOU NEED TO ENTER THE ACCOUNT PASSWORD ABOVE. 'userAgent' above is the default single user agent; 'userAgents' is a list used when optionsFca.randomUserAgent is true (the bot picks one at random on each login to reduce detection)"
+    "notes": "time the system automatically retrieves new cookies from email/password, unit is minute, if you set null, the system will not automatically retrieve new cookies, it saves you from having to manually change your cookie every time it expires. recommended set to 1440 (1day) or 4320 (3day).TO BE ABLE TO USE THIS FEATURE YOU NEED TO ENTER THE ACCOUNT PASSWORD ABOVE"
   },
   "antiInbox": false,
   "language": "en",
   "notesLanguage": "change to your language with ISO 639-1 code, available languages: vi (Vietnamese), en (English)",
-  "nickNameBot": "গেসুকে 😈",
-  "prefix": "~",
-  "commandSuggestion": {
-    "enable": true,
-    "notes": "when someone types a command name that does not exist, the bot suggests the closest matching command (for example '-holp' => '-help'). Set enable to false to turn it off"
-  },
-  "noPrefix": {
-    "enable": false,
-    "onlyAdminBot": false,
-    "ignoreCommands": [],
-    "notes": "if enable is true, every command can be used without the prefix (for example 'help' instead of '-help'). Normal messages that are not a command are ignored, so they will never trigger a command by accident. If onlyAdminBot is true, only bot admins can use commands without prefix. Add command names to ignoreCommands if you want to exclude them from noPrefix"
-  },
-  "reactUnsend": {
-    "enable": true,
-    "emojis": [
-      "😡",
-      "😠"
-    ],
-    "onlyAdmin": true,
-    "notes": "when an admin reacts to one of the bot's messages with one of these emojis, the bot unsends (deletes) that message. If onlyAdmin is true, only the bot's admins (adminBot) and group admins can do this; set it to false to allow anyone"
-  },
-  "reactMirror": {
-    "enable": true,
-    "mirrorAllEmojis": true,
-    "emojis": [],
-    "onlyAdmin": true,
-    "notes": "when an admin reacts to someone's message, the bot mirrors (adds) the SAME emoji reaction to that message, as long as the bot is in that chat. Works on any non-bot message, including group members' messages. If mirrorAllEmojis is true, every emoji is mirrored and the emojis list is ignored. If mirrorAllEmojis is false, only the emojis listed in emojis are mirrored. The bot never mirrors its own messages. If onlyAdmin is true, only the bot's admins (adminBot) and group admins can trigger it; set it to false to allow anyone"
-  },
+  "nickNameBot": "GoatBot",
+  "prefix": "-",
   "adminOnly": {
     "enable": false,
     "ignoreCommand": []
   },
-  "adminBot": [
-    "61588057525081"
-  ],
+  "adminBot": [],
   "whiteListMode": {
     "enable": false,
     "whiteListIds": [],
@@ -78,7 +37,7 @@
     "autoRefreshThreadInfoFirstTime": true,
     "notes": "(1) type selects 'json' or 'sqlite' or 'mongodb'. If you choose mongodb, enter uri connect mongodb in the uriMongodb section, instructions to get uri connect mongodb at: https://youtu.be/z1f9urHW5xY. I recommend using 'mongodb' or 'sqlite', json is not recommended because it is not stable. (2) when you set autoSyncWhenStart to true, the bot will automatically synchronize the data in the database when starting the bot, this will make the bot start slower. (3) when you set autoRefreshThreadInfoFirstTime to true, the bot will automatically refresh the thread information when get first message from the thread since starting the bot"
   },
-  "timeZone": "Asia/Dhaka",
+  "timeZone": "Asia/Ho_Chi_Minh",
   "credentials": {
     "gmailAccount": {
       "email": "",
@@ -93,11 +52,9 @@
     }
   },
   "dashBoard": {
-    "enable": true,
+    "enable": false,
     "expireVerifyCode": 300000,
-    "port": 3001,
-    "sessionSecret": "",
-    "notes": "sessionSecret is optional. When empty, a random secret is generated on each start, which logs everyone out after a restart. Set it to any long random string to keep dashboard logins valid across restarts"
+    "port": 3001
   },
   "serverUptime": {
     "enable": false,
@@ -105,8 +62,7 @@
     "socket": {
       "enable": true,
       "channelName": "uptime",
-      "verifyToken": "",
-      "notes": "verifyToken is the password clients must send to connect to the socket.io uptime server. Set it to any long random string. When empty, a random token is generated at startup and the bot stays up; set a fixed value so clients can reconnect reliably"
+      "verifyToken": ""
     }
   },
   "autoRestart": {
@@ -127,9 +83,9 @@
   },
   "autoRefreshFbstate": true,
   "autoReloginWhenChangeAccount": false,
-  "autoRestartWhenListenMqttError": true,
+  "autoRestartWhenListenMqttError": false,
   "restartListenMqtt": {
-    "enable": false,
+    "enable": true,
     "timeRestart": 3600000,
     "delayAfterStopListening": 2000,
     "logNoti": true,
@@ -163,6 +119,28 @@
     "needRoleToUseCmdOnReply": false,
     "needRoleToUseCmdOnReaction": false
   },
+  "customFeatures": {
+    "unsendOnReaction": {
+      "enable": true,
+      "reactions": [
+        "😠",
+        "😡"
+      ],
+      "notes": "when a bot admin (role 2) reacts with one of the reactions below on a message sent by the bot, the bot will unsend that message. Add or remove emojis in the reactions array to change which ones trigger the unsend."
+    },
+    "reactMirror": {
+      "enable": true,
+      "notes": "when a bot admin (role 2) reacts with any emoji on someone else's message, the bot mirrors the same emoji onto that message. The bot never mirrors onto its own messages, and never reacts to its own reactions."
+    },
+    "noPrefix": {
+      "enable": false,
+      "notes": "allow using commands without a prefix. Normal messages are never treated as commands: a message only runs a command when its first word exactly matches a command name or alias (for example \"help\" instead of \"-help\"). Set enable to true to turn it on."
+    },
+    "commandSuggestion": {
+      "enable": true,
+      "notes": "when a prefixed command is not found (e.g. \"-holp\"), reply with the closest command name (e.g. \"Did you mean -help?\"). Set enable to false to disable."
+    }
+  },
   "logEvents": {
     "disableAll": false,
     "message": true,
@@ -183,8 +161,7 @@
     "selfListen": false,
     "selfListenEvent": true,
     "autoMarkDelivery": false,
-    "autoReconnect": true,
-    "randomUserAgent": false,
-    "notes": "FCA options passed to the login library. If randomUserAgent is true, the bot picks a random user agent from facebookAccount.userAgents on each login"
+    "autoReconnect": false,
+    "notes": "Document here: https://github.com/ntkhang03/fb-chat-api/blob/master/DOCS.md#apisetoptionsoptions "
   }
 }

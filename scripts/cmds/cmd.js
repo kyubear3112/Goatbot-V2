@@ -319,10 +319,6 @@ function loadScripts(folder, fileName, log, configCommands, api, threadModel, us
 					packageAlready.push(packageName);
 					if (!fs.existsSync(`${process.cwd()}/node_modules/${packageName}`)) {
 						let wating;
-						const clearLine = () => {
-							if (typeof process.stderr.clearLine == "function")
-								process.stderr.clearLine();
-						};
 						try {
 							wating = setInterval(() => {
 								count++;
@@ -330,11 +326,11 @@ function loadScripts(folder, fileName, log, configCommands, api, threadModel, us
 							}, 80);
 							execSync(`npm install ${packageName} --save`, { stdio: "pipe" });
 							clearInterval(wating);
-							clearLine();
+							process.stderr.clearLine();
 						}
 						catch (error) {
 							clearInterval(wating);
-							clearLine();
+							process.stderr.clearLine();
 							throw new Error(`Can't install package ${packageName}`);
 						}
 					}

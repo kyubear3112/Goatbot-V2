@@ -1,91 +1,64 @@
-const axios = require("axios");
-const { getStreamFromURL, findUid } = global.utils;
+const { findUid, getStreamFromURL } = global.utils;
+const regExCheckURL = /^(http|https):\/\/[^ "]+$/;
 
 module.exports = {
 	config: {
 		name: "pfp",
-		aliases: ["profilepic", "avataruser", "getavatar"],
+		aliases: ["profile", "pp", "cover"],
 		version: "1.0",
 		author: "Neoaz 🐊",
 		countDown: 5,
 		role: 0,
 		description: {
-			en: "get the profile picture of a facebook user"
+			en: "View the HD profile picture and cover photo of a user"
 		},
 		category: "info",
 		guide: {
-			en: "{pn}: get your own profile picture"
-				+ "\n   {pn} @tag: get the profile picture of tagged people"
-				+ "\n   {pn} <uid | profile link>"
-				+ "\n   {pn} (reply to a message)"
+			en: "   {pn}: view your own profile picture and cover photo"
+				+ "\n   {pn} @tag: view the tagged user's profile picture and cover photo"
+				+ "\n   {pn} <profile link>: view from a profile link"
+				+ "\n   {pn} <uid>: view by user id"
+				+ "\n   Reply to someone's message with the command to view theirs"
 		}
 	},
 
-	langs: {
-		en: {
-			loading: "🐊 Looking up the profile picture...",
-			noTarget: "❌ Please tag someone, reply to their message, or give a uid / profile link.",
-			notFound: "❌ Could not find the profile picture for this user.",
-			error: "❌ An error occurred:\n%1",
-			caption: "🖼️ Profile picture of %1"
-		}
-	},
-
-	onStart: async function ({ args, message, event, getLang, api }) {
-		const mentions = Object.keys(event.mentions || {});
-		let target = mentions.length
-			? mentions
-			: (event.type === "message_reply" ? [event.messageReply.senderID] : null)
-				|| (args[0] ? [args[0]] : [event.senderID]);
-
-		const resolved = [];
-		for (const item of target) {
-			if (/^\d+$/.test(item)) {
-				resolved.push({ uid: item, name: event.mentions?.[item]?.replace(/@/g, "") || null });
-				continue;
-			}
-			try {
-				const uid = await findUid(item);
-				resolved.push({ uid, name: null });
-			}
-			catch (err) {
-				return message.reply(getLang("error", err.message));
-			}
-		}
-
-		if (!resolved.length || resolved.some(item => !item.uid))
-			return message.reply(getLang("notFound"));
-
-		const msg = await message.reply(getLang("loading"));
+	onStart: async function ({ message, event, args, api }) {
+		await react(api, event, "⏳");
 		try {
-			const attachments = [];
-			const names = [];
-			for (const item of resolved) {
-				let name = item.name;
-				if (!name) {
-					try {
-						const info = (await axios.get(`https://graph.facebook.com/${item.uid}?fields=name&access_token=6628568379%7Cc1e620fa708a1d5696fb991c1bde5662`, { timeout: 10000 })).data;
-						name = info.name;
-					}
-					catch (err) { }
-				}
-				names.push(name || item.uid);
-				const pfpUrl = `https://graph.facebook.com/${item.uid}/picture?height=1500&width=1500&access_token=6628568379%7Cc1e620fa708a1d5696fb991c1bde5662`;
-				attachments.push(await getStreamFromURL(pfpUrl, `pfp_${item.uid}.jpg`));
-			}
+			let uid = event.senderID;
+			if (event.messageReply)
+				uid = event.messageReply.senderID;
+			else if (args[0] && regExCheckURL.test(args[0]))
+				uid = await findUid(args[0]);
+			else if (Object.keys(event.mentions || {}).length)
+				uid = Object.keys(event.mentions)[0];
+			else if (args[0] && /^\d+$/.test(args[0]))
+				uid = args[0];
 
-			const caption = getLang("caption", names.join(", "));
-			if (msg && msg.messageID && typeof api.editMessage == "function") {
-				await api.editMessage(caption, msg.messageID);
-				return message.send({ attachment: attachments.length === 1 ? attachments[0] : attachments });
-			}
-			return message.send({ body: caption, attachment: attachments.length === 1 ? attachments[0] : attachments });
+			const info = await api.getUserInfo(uid);
+			const user = info[uid];
+			if (!user || !user.profilePictureHd)
+				throw new Error("no profile picture found");
+
+			const attachment = [await getStreamFromURL(user.profilePictureHd)];
+			if (user.coverPhoto)
+				attachment.push(await getStreamFromURL(user.coverPhoto));
+
+			await message.reply({
+				body: user.name || uid,
+				attachment
+			});
+			await react(api, event, "✅");
 		}
-		catch (err) {
-			if (msg && msg.messageID && typeof api.editMessage == "function")
-				await api.editMessage(getLang("error", err.message), msg.messageID);
-			else
-				return message.reply(getLang("error", err.message));
+		catch (e) {
+			await react(api, event, "❌");
 		}
 	}
 };
+
+async function react(api, event, emoji) {
+	try {
+		await api.setMessageReaction(emoji, event.messageID, event.threadID);
+	}
+	catch (e) { }
+}

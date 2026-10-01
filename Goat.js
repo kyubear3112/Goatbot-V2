@@ -34,12 +34,12 @@ function validJSON(pathDir) {
 	try {
 		if (!fs.existsSync(pathDir))
 			throw new Error(`File "${pathDir}" not found`);
-		JSON.parse(fs.readFileSync(pathDir, 'utf8'));
+		JSON.parse(fs.readFileSync(pathDir, "utf8"));
 		return true;
 	}
 	catch (err) {
-		let msgError = err.message;
-		msgError = msgError.split("\n").slice(1).join("\n");
+		let msgError = err.message || String(err);
+		msgError = msgError.split("\n").slice(1).join("\n") || err.message || String(err);
 		const indexPos = msgError.indexOf("    at");
 		msgError = msgError.slice(0, indexPos != -1 ? indexPos - 1 : msgError.length);
 		throw new Error(msgError);
@@ -47,12 +47,9 @@ function validJSON(pathDir) {
 }
 
 const { NODE_ENV } = process.env;
-// Only "development" uses the *.dev.* files; "production" (Render/Railway etc.)
-// uses the normal config.json / configCommands.json / account.txt.
-const isDev = NODE_ENV === "development";
-const dirConfig = path.normalize(`${__dirname}/config${isDev ? '.dev.json' : '.json'}`);
-const dirConfigCommands = path.normalize(`${__dirname}/configCommands${isDev ? '.dev.json' : '.json'}`);
-const dirAccount = path.normalize(`${__dirname}/account${isDev ? '.dev.txt' : '.txt'}`);
+const dirConfig = path.normalize(`${__dirname}/config${['production', 'development'].includes(NODE_ENV) ? '.dev.json' : '.json'}`);
+const dirConfigCommands = path.normalize(`${__dirname}/configCommands${['production', 'development'].includes(NODE_ENV) ? '.dev.json' : '.json'}`);
+const dirAccount = path.normalize(`${__dirname}/account${['production', 'development'].includes(NODE_ENV) ? '.dev.txt' : '.txt'}`);
 
 for (const pathDir of [dirConfig, dirConfigCommands]) {
 	try {
@@ -66,18 +63,6 @@ for (const pathDir of [dirConfig, dirConfigCommands]) {
 const config = require(dirConfig);
 if (config.whiteListMode?.whiteListIds && Array.isArray(config.whiteListMode.whiteListIds))
 	config.whiteListMode.whiteListIds = config.whiteListMode.whiteListIds.map(id => id.toString());
-// Fill in defaults for newer feature settings so configs created before they
-// existed keep working without manual edits.
-config.commandSuggestion = { enable: true, ...(config.commandSuggestion || {}) };
-config.noPrefix = { enable: false, onlyAdminBot: false, ignoreCommands: [], ...(config.noPrefix || {}) };
-config.reactUnsend = { enable: true, emojis: ["😡", "😠"], onlyAdmin: true, ...(config.reactUnsend || {}) };
-config.reactMirror = { enable: true, mirrorAllEmojis: true, emojis: [], onlyAdmin: true, ...(config.reactMirror || {}) };
-if (!Array.isArray(config.reactUnsend.emojis))
-	config.reactUnsend.emojis = ["😡", "😠"];
-if (!Array.isArray(config.reactMirror.emojis))
-	config.reactMirror.emojis = [];
-if (!Array.isArray(config.noPrefix.ignoreCommands))
-	config.noPrefix.ignoreCommands = [];
 const configCommands = require(dirConfigCommands);
 
 global.GoatBot = {
@@ -154,7 +139,6 @@ global.temp = {
 	createThreadData: [],
 	createUserData: [],
 	createThreadDataError: [], // Can't get info of groups with instagram members
-	messagesOfBot: new Set(), // IDs of messages sent by the bot (used by reactUnsend)
 	filesOfGoogleDrive: {
 		arraybuffer: {},
 		stream: {},
@@ -236,20 +220,19 @@ if (config.autoRestart) {
 	// ———————————————— SETUP MAIL ———————————————— //
 	const { gmailAccount } = config.credentials;
 	const { email, clientId, clientSecret, refreshToken } = gmailAccount;
-	const OAuth2 = google.auth.OAuth2;
+	const hasGoogleCredentials = !!(clientId && clientSecret && refreshToken);
+	let transporter = null;
 	let accessToken;
-	let transporter;
-	if (clientId && clientSecret && refreshToken) {
+	if (hasGoogleCredentials) {
+		const OAuth2 = google.auth.OAuth2;
 		const OAuth2_client = new OAuth2(clientId, clientSecret);
 		OAuth2_client.setCredentials({ refresh_token: refreshToken });
 		try {
 			accessToken = await OAuth2_client.getAccessToken();
 		}
 		catch (err) {
-			utils.log.warn("CREDENTIALS", getText("Goat", "googleApiTokenExpired"));
+			throw new Error(getText("Goat", "googleApiTokenExpired"));
 		}
-	}
-	if (accessToken) {
 		transporter = nodemailer.createTransport({
 			host: 'smtp.gmail.com',
 			service: 'Gmail',
@@ -263,10 +246,12 @@ if (config.autoRestart) {
 			}
 		});
 	}
+	else
+		utils.log.warn("MAIL", "Google API credentials are not set, mail features are disabled");
 
 	async function sendMail({ to, subject, text, html, attachments }) {
 		if (!transporter)
-			throw new Error("Email is not configured. Set credentials.gmailAccount in config.json.");
+			throw new Error("Mail is not configured, please add Google API credentials in config.json");
 		const mailOptions = {
 			from: email,
 			to,
@@ -283,29 +268,20 @@ if (config.autoRestart) {
 	global.utils.transporter = transporter;
 
 	// ———————————————— CHECK VERSION ———————————————— //
-	try {
-		const { data: { version } } = await axios.get("https://raw.githubusercontent.com/ntkhang03/Goat-Bot-V2/main/package.json");
-		const currentVersion = require("./package.json").version;
-		if (compareVersion(version, currentVersion) === 1)
-			utils.log.master("NEW VERSION", getText(
-				"Goat",
-				"newVersionDetected",
-				colors.gray(currentVersion),
-				colors.hex("#eb6a07", version),
-				colors.hex("#eb6a07", "node update")
-			));
-	}
-	catch (err) {
-		utils.log.warn("CHECK VERSION", err.message || err);
-	}
+	const { data: { version } } = await axios.get("https://raw.githubusercontent.com/ntkhang03/Goat-Bot-V2/main/package.json");
+	const currentVersion = require("./package.json").version;
+	if (compareVersion(version, currentVersion) === 1)
+		utils.log.master("NEW VERSION", getText(
+			"Goat",
+			"newVersionDetected",
+			colors.gray(currentVersion),
+			colors.hex("#eb6a07", version),
+			colors.hex("#eb6a07", "node update")
+		));
 	// —————————— CHECK FOLDER GOOGLE DRIVE —————————— //
-	let parentIdGoogleDrive;
-	try {
-		parentIdGoogleDrive = await utils.drive.checkAndCreateParentFolder("GoatBot");
+	if (hasGoogleCredentials) {
+		const parentIdGoogleDrive = await utils.drive.checkAndCreateParentFolder("GoatBot");
 		utils.drive.parentID = parentIdGoogleDrive;
-	}
-	catch (err) {
-		utils.log.warn("GOOGLE DRIVE", err.message || err);
 	}
 	// ———————————————————— LOGIN ———————————————————— //
 	require(`./bot/login/login${NODE_ENV === 'development' ? '.dev.js' : '.js'}`);

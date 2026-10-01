@@ -23,12 +23,12 @@ module.exports = {
 		},
 		category: "info",
 		guide: {
-			vi: "   {pn}: hiển thị tất cả lệnh theo danh mục"
-				+ "\n   {pn} <tên lệnh> [-u | usage | -g | guide]: chỉ hiển thị phần hướng dẫn sử dụng lệnh"
-				+ "\n   {pn} <tên lệnh> [-i | info]: chỉ hiển thị phần thông tin về lệnh"
-				+ "\n   {pn} <tên lệnh> [-r | role]: chỉ hiển thị phần quyền hạn của lệnh"
-				+ "\n   {pn} <tên lệnh> [-a | alias]: chỉ hiển thị phần tên viết tắt của lệnh",
-			en: "{pn}: show every command grouped by category"
+			vi: "   {pn} [để trống | <số trang> | <tên lệnh>]"
+				+ "\n   {pn} <command name> [-u | usage | -g | guide]: chỉ hiển thị phần hướng dẫn sử dụng lệnh"
+				+ "\n   {pn} <command name> [-i | info]: chỉ hiển thị phần thông tin về lệnh"
+				+ "\n   {pn} <command name> [-r | role]: chỉ hiển thị phần quyền hạn của lệnh"
+				+ "\n   {pn} <command name> [-a | alias]: chỉ hiển thị phần tên viết tắt của lệnh",
+			en: "{pn} [empty | <page number> | <command name>]"
 				+ "\n   {pn} <command name> [-u | usage | -g | guide]: only show command usage"
 				+ "\n   {pn} <command name> [-i | info]: only show command info"
 				+ "\n   {pn} <command name> [-r | role]: only show command role"
@@ -39,16 +39,21 @@ module.exports = {
 
 	langs: {
 		vi: {
-			header: "☠️ %1 ☠️",
-			summary: "%1 lệnh trong %2 danh mục",
-			categoryHeader: "╭─『 %1 』",
-			categoryFooter: "╰───────────────♢",
-			commandLine: "│ %1",
-			joiner: " • ",
-			noCommands: "Không có lệnh nào trong danh mục này",
-			tip: "Gõ %1help <tên lệnh> để xem chi tiết",
-			total: "Total Commands: %1",
-			footerTip: "Type: %1help <command> for details",
+			help: "╭─────────────⭓"
+				+ "\n%1"
+				+ "\n├─────⭔"
+				+ "\n│ Trang [ %2/%3 ]"
+				+ "\n│ Hiện tại bot có %4 lệnh có thể sử dụng"
+				+ "\n│ » Gõ %5help <số trang> để xem danh sách các lệnh"
+				+ "\n│ » Gõ %5help để xem chi tiết cách sử dụng lệnh đó"
+				+ "\n├────────⭔"
+				+ "\n│ %6"
+				+ "\n╰─────────────⭓",
+			help2: "%1├───────⭔"
+				+ "\n│ » Hiện tại bot có %2 lệnh có thể sử dụng"
+				+ "\n│ » Gõ %3help <tên lệnh> để xem chi tiết cách sử dụng lệnh đó"
+				+ "\n│ %4"
+				+ "\n╰─────────────⭓",
 			commandNotFound: "Lệnh \"%1\" không tồn tại",
 			getInfoCommand: "╭── NAME ────⭓"
 				+ "\n│ %1"
@@ -91,19 +96,25 @@ module.exports = {
 			roleText1: "1 (Quản trị viên nhóm)",
 			roleText2: "2 (Admin bot)",
 			roleText0setRole: "0 (set role, tất cả người dùng)",
-			roleText1setRole: "1 (set role, quản trị viên nhóm)"
+			roleText1setRole: "1 (set role, quản trị viên nhóm)",
+			pageNotFound: "Trang %1 không tồn tại"
 		},
 		en: {
-			header: "☠️ %1 ☠️",
-			summary: "%1 commands in %2 categories",
-			categoryHeader: "╭─『 %1 』",
-			categoryFooter: "╰───────────────♢",
-			commandLine: "│ %1",
-			joiner: " • ",
-			noCommands: "No commands in this category",
-			tip: "Type %1help <command name> to view its details",
-			total: "Total Commands: %1",
-			footerTip: "Type: %1help <command> for details",
+			help: "╭─────────────⭓"
+				+ "\n%1"
+				+ "\n├─────⭔"
+				+ "\n│ Page [ %2/%3 ]"
+				+ "\n│ Currently, the bot has %4 commands that can be used"
+				+ "\n│ » Type %5help <page> to view the command list"
+				+ "\n│ » Type %5help to view the details of how to use that command"
+				+ "\n├────────⭔"
+				+ "\n│ %6"
+				+ "\n╰─────────────⭓",
+			help2: "%1├───────⭔"
+				+ "\n│ » Currently, the bot has %2 commands that can be used"
+				+ "\n│ » Type %3help <command name> to view the details of how to use that command"
+				+ "\n│ %4"
+				+ "\n╰─────────────⭓",
 			commandNotFound: "Command \"%1\" does not exist",
 			getInfoCommand: "╭── NAME ────⭓"
 				+ "\n│ %1"
@@ -146,7 +157,8 @@ module.exports = {
 			roleText1: "1 (Group administrators)",
 			roleText2: "2 (Admin bot)",
 			roleText0setRole: "0 (set role, all users)",
-			roleText1setRole: "1 (set role, group administrators)"
+			roleText1setRole: "1 (set role, group administrators)",
+			pageNotFound: "Page %1 does not exist"
 		}
 	},
 
@@ -160,6 +172,9 @@ module.exports = {
 		const { threadID } = event;
 		const threadData = await threadsData.get(threadID);
 		const prefix = getPrefix(threadID);
+		let sortHelp = threadData.settings.sortHelp || "name";
+		if (!["category", "name"].includes(sortHelp))
+			sortHelp = "name";
 		const commandName = (args[0] || "").toLowerCase();
 		let command = commands.get(commandName) || commands.get(aliases.get(commandName));
 		const aliasesData = threadData.data.aliases || {
@@ -189,59 +204,63 @@ module.exports = {
 		}
 
 		// ———————————————— LIST ALL COMMAND ——————————————— //
-		if (!command && (!args[0] || !isNaN(args[0]))) {
-			const categories = new Map();
-			for (const [name, value] of commands) {
-				if (value.config.role > 1 && role < value.config.role)
-					continue;
+		if (!command && !args[0] || !isNaN(args[0])) {
+			const arrayInfo = [];
+			let msg = "";
+			if (sortHelp == "name") {
+				const page = parseInt(args[0]) || 1;
+				const numberOfOnePage = 30;
+				for (const [name, value] of commands) {
+					if (value.config.role > 1 && role < value.config.role)
+						continue;
+					let describe = name;
+					let description;
+					const descriptionCustomLang = customLang[name]?.description;
+					if (descriptionCustomLang != undefined)
+						description = checkLangObject(descriptionCustomLang, langCode);
+					else if (value.config.description)
+						description = checkLangObject(value.config.description, langCode);
+					if (description)
+						describe += `: ${cropContent(description.charAt(0).toUpperCase() + description.slice(1), 50)}`;
+					arrayInfo.push({
+						data: describe,
+						priority: value.priority || 0
+					});
+				}
 
-				const category = (value.config.category || "NO CATEGORY").toLowerCase();
-				const descriptionCustomLang = customLang[name]?.description;
-				let description;
-				if (descriptionCustomLang != undefined)
-					description = checkLangObject(descriptionCustomLang, langCode);
-				else if (value.config.description)
-					description = checkLangObject(value.config.description, langCode);
-				if (description)
-					description = cropContent(description.charAt(0).toUpperCase() + description.slice(1), 46);
-				else
-					description = "—";
+				arrayInfo.sort((a, b) => a.data - b.data); // sort by name
+				arrayInfo.sort((a, b) => a.priority > b.priority ? -1 : 1); // sort by priority
+				const { allPage, totalPage } = global.utils.splitPage(arrayInfo, numberOfOnePage);
+				if (page < 1 || page > totalPage)
+					return message.reply(getLang("pageNotFound", page));
 
-				if (!categories.has(category))
-					categories.set(category, []);
-				categories.get(category).push({
-					name,
-					description,
-					priority: value.priority || 0
+				const returnArray = allPage[page - 1] || [];
+				const startNumber = (page - 1) * numberOfOnePage + 1;
+				msg += (returnArray || []).reduce((text, item, index) => text += `│ ${index + startNumber}${index + startNumber < 10 ? " " : ""}. ${item.data}\n`, '').slice(0, -1);
+				await message.reply(getLang("help", msg, page, totalPage, commands.size, prefix, doNotDelete));
+			}
+			else if (sortHelp == "category") {
+				for (const [, value] of commands) {
+					if (value.config.role > 1 && role < value.config.role)
+						continue; // if role of command > role of user => skip
+					const indexCategory = arrayInfo.findIndex(item => (item.category || "NO CATEGORY") == (value.config.category?.toLowerCase() || "NO CATEGORY"));
+
+					if (indexCategory != -1)
+						arrayInfo[indexCategory].names.push(value.config.name);
+					else
+						arrayInfo.push({
+							category: value.config.category.toLowerCase(),
+							names: [value.config.name]
+						});
+				}
+				arrayInfo.sort((a, b) => (a.category < b.category ? -1 : 1));
+				arrayInfo.forEach((data, index) => {
+					const categoryUpcase = `${index == 0 ? `╭` : `├`}─── ${data.category.toUpperCase()} ${index == 0 ? "⭓" : "⭔"}`;
+					data.names = data.names.sort().map(item => item = `│ ${item}`);
+					msg += `${categoryUpcase}\n${data.names.join("\n")}\n`;
 				});
+				message.reply(getLang("help2", msg, commands.size, prefix, doNotDelete));
 			}
-
-			const sortedCategories = [...categories.entries()]
-				.map(([category, list]) => {
-					list.sort((a, b) => a.name.localeCompare(b.name));
-					return { category, list };
-				})
-				.sort((a, b) => a.category.localeCompare(b.category));
-
-			let total = 0;
-			const lines = [];
-			const botName = global.GoatBot?.config?.nickNameBot || "Goat Bot";
-			const header = getLang("header", botName);
-			const boxWidth = visualWidth(getLang("categoryFooter"));
-			const pad = Math.max(0, Math.floor((boxWidth - visualWidth(header)) / 2));
-			lines.push(" ".repeat(pad) + header);
-
-			for (const { category, list } of sortedCategories) {
-				total += list.length;
-				lines.push("");
-				lines.push(getLang("categoryHeader", category.toUpperCase()));
-				lines.push(getLang("commandLine", list.map(item => item.name).join(getLang("joiner"))));
-				lines.push(getLang("categoryFooter"));
-			}
-
-			lines.push(getLang("total", total));
-			lines.push(getLang("footerTip", prefix));
-			return message.reply(lines.join("\n"));
 		}
 		// ———————————— COMMAND DOES NOT EXIST ———————————— //
 		else if (!command && args[0]) {
@@ -387,18 +406,4 @@ function cropContent(content, max) {
 		content = content + "...";
 	}
 	return content;
-}
-
-function visualWidth(text) {
-	let width = 0;
-	for (const ch of String(text)) {
-		const cp = ch.codePointAt(0);
-		if (cp === 0xfe0f || cp === 0x200d)
-			continue;
-		if (cp >= 0x1f000 || (cp >= 0x2600 && cp <= 0x27bf) || (cp >= 0x2b00 && cp <= 0x2bff))
-			width += 2;
-		else
-			width += 1;
-	}
-	return width;
 }

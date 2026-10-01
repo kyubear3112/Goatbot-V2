@@ -11,8 +11,7 @@ const nodemailer = require("nodemailer");
 const cookieParser = require("cookie-parser");
 const flash = require("connect-flash");
 const Passport = require("passport");
-const bcrypt = require("bcrypt");
-const FileStore = require("./scripts/sessionStore.js");
+const bcrypt = require("bcryptjs");
 const axios = require("axios");
 const mimeDB = require("mime-db");
 const http = require("http");
@@ -41,6 +40,11 @@ module.exports = async (api) => {
 	const { expireVerifyCode } = config.dashBoard;
 	const { gmailAccount, gRecaptcha } = config.credentials;
 
+	if (!gmailAccount.clientId || !gmailAccount.clientSecret || !gmailAccount.refreshToken) {
+		global.utils.log.warn("DASHBOARD", "Google API credentials are not set, dashboard is disabled. Add them in config.json to enable the dashboard.");
+		return;
+	}
+
 	const getText = global.utils.getText;
 
 	const {
@@ -51,39 +55,28 @@ module.exports = async (api) => {
 	} = gmailAccount;
 
 	const OAuth2 = google.auth.OAuth2;
-	let transporter;
-	if (clientId && clientSecret && refreshToken) {
-		const OAuth2_client = new OAuth2(clientId, clientSecret);
-		OAuth2_client.setCredentials({ refresh_token: refreshToken });
-		let accessToken;
-		try {
-			accessToken = await OAuth2_client.getAccessToken();
-		}
-		catch (err) {
-			throw new Error(getText("Goat", "googleApiRefreshTokenExpired"));
-		}
+	const OAuth2_client = new OAuth2(clientId, clientSecret);
+	OAuth2_client.setCredentials({ refresh_token: refreshToken });
+	let accessToken;
+	try {
+		accessToken = await OAuth2_client.getAccessToken();
+	}
+	catch (err) {
+		throw new Error(getText("Goat", "googleApiRefreshTokenExpired"));
+	}
 
-		transporter = nodemailer.createTransport({
-			host: "smtp.gmail.com",
-			service: "Gmail",
-			auth: {
-				type: "OAuth2",
-				user: email,
-				clientId,
-				clientSecret,
-				refreshToken,
-				accessToken
-			}
-		});
-	}
-	else {
-		require("../logger/log.js").warn("DASHBOARD", "Google credentials are not fully configured; email verification (register/forgot password) is disabled.");
-		transporter = {
-			sendMail: async () => {
-				throw new Error("Email is not configured. Set credentials.gmailAccount in config.json.");
-			}
-		};
-	}
+	const transporter = nodemailer.createTransport({
+		host: "smtp.gmail.com",
+		service: "Gmail",
+		auth: {
+			type: "OAuth2",
+			user: email,
+			clientId,
+			clientSecret,
+			refreshToken,
+			accessToken
+		}
+	});
 
 
 	const {
@@ -114,11 +107,9 @@ module.exports = async (api) => {
 	app.use(bodyParser.urlencoded({ extended: true }));
 	app.use(cookieParser());
 	app.use(session({
-		secret: config.dashBoard.sessionSecret || randomStringApikey(10),
-		store: new FileStore({ ttl: 1000 * 60 * 60 * 24 * 7 }),
+		secret: randomStringApikey(10),
 		resave: false,
-		saveUninitialized: false,
-		rolling: true,
+		saveUninitialized: true,
 		cookie: {
 			secure: false,
 			httpOnly: true,
@@ -219,7 +210,7 @@ module.exports = async (api) => {
 	app.get("/stats", async (req, res) => {
 		let fcaVersion;
 		try {
-			fcaVersion = require("xtreme-fca/package.json").version;
+			fcaVersion = require("neokex-fca/package.json").version;
 		}
 		catch (e) {
 			fcaVersion = "unknown";
@@ -269,7 +260,7 @@ module.exports = async (api) => {
 				message: getText("app", "notFoundFbstate")
 			});
 
-		fs.writeFileSync(process.cwd() + (process.env.NODE_ENV == "development" ? "/account.dev.txt" : "/account.txt"), fbstate);
+		fs.writeFileSync(process.cwd() + (process.env.NODE_ENV == "production" || process.env.NODE_ENV == "development" ? "/account.dev.txt" : "/account.txt"), fbstate);
 		res.send({
 			status: "success",
 			message: getText("app", "changedFbstateSuccess")
@@ -283,7 +274,7 @@ module.exports = async (api) => {
 
 	app.get("/changefbstate", isAuthenticated, isVeryfiUserIDFacebook, isAdmin, (req, res) => {
 		res.render("changeFbstate", {
-			currentFbstate: fs.readFileSync(process.cwd() + (process.env.NODE_ENV == "development" ? "/account.dev.txt" : "/account.txt"), "utf8")
+			currentFbstate: fs.readFileSync(process.cwd() + (process.env.NODE_ENV == "production" || process.env.NODE_ENV == "development" ? "/account.dev.txt" : "/account.txt"), "utf8")
 		});
 	});
 
@@ -305,7 +296,7 @@ module.exports = async (api) => {
 			return res.status(500).send(getText("app", "serverError"));
 	});
 
-	const PORT = process.env.PORT || config.dashBoard.port || config.serverUptime.port || 3001;
+	const PORT = config.dashBoard.port || config.serverUptime.port || 3001;
 	let dashBoardUrl = `https://${process.env.REPL_OWNER
 		? `${process.env.REPL_SLUG}.${process.env.REPL_OWNER}.repl.co`
 		: process.env.API_SERVER_EXTERNAL == "https://api.glitch.com"

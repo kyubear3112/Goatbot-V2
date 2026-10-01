@@ -1,6 +1,5 @@
 const { readdirSync, readFileSync, writeFileSync, existsSync } = require("fs-extra");
 const path = require("path");
-const { builtinModules } = require("module");
 const exec = (cmd, options) => new Promise((resolve, reject) => {
 	require("child_process").exec(cmd, options, (err, stdout) => {
 		if (err)
@@ -76,9 +75,7 @@ module.exports = async function (api, threadModel, userModel, dashBoardModel, gl
 				let allPackage = contentFile.match(regExpCheckPackage);
 				if (allPackage) {
 					allPackage = allPackage.map(p => p.match(/[`'"]([^`'"]+)[`'"]/)[1])
-						.filter(p => p.indexOf("/") !== 0 && p.indexOf("./") !== 0 && p.indexOf("../") !== 0 && p.indexOf(__dirname) !== 0)
-						// Node.js built-in modules are not npm packages and must not be installed.
-						.filter(p => !builtinModules.includes(p.replace(/^node:/, "")));
+						.filter(p => p.indexOf("/") !== 0 && p.indexOf("./") !== 0 && p.indexOf("../") !== 0 && p.indexOf(__dirname) !== 0);
 					for (let packageName of allPackage) {
 						// @user/abc => @user/abc
 						// @user/abc/dist/xyz.js => @user/abc
@@ -87,6 +84,9 @@ module.exports = async function (api, threadModel, userModel, dashBoardModel, gl
 							packageName = packageName.split('/').slice(0, 2).join('/');
 						else
 							packageName = packageName.split('/')[0];
+
+						if (packageName.startsWith("node:") || require("module").isBuiltin(packageName))
+							continue;
 
 						if (!packageAlready.includes(packageName)) {
 							packageAlready.push(packageName);

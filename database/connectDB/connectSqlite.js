@@ -1,19 +1,10 @@
 module.exports = async function () {
 	const { Sequelize } = require("sequelize");
-	const fs = require("fs");
-	// Allow overriding the database location (e.g. when the project directory
-	// lives on a network filesystem such as NFS, where SQLite cannot take file
-	// locks). Defaults to the project's database/data/data.sqlite file.
-	const path = process.env.GOAT_DB_PATH || (__dirname + "/../data/data.sqlite");
+	const path = __dirname + "/../data/data.sqlite";
 	const sequelize = new Sequelize({
 		dialect: "sqlite",
 		host: path,
-		logging: false,
-		dialectOptions: {
-			// Reduce "database is locked" failures by waiting for the lock
-			// instead of erroring immediately.
-			busyTimeout: 10000
-		}
+		logging: false
 	});
 
 	const threadModel = require("../models/sqlite/thread.js")(sequelize);

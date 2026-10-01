@@ -15,6 +15,72 @@ function getRole(threadData, senderID) {
 	return adminBot.includes(senderID) ? 2 : adminBox.includes(senderID) ? 1 : 0;
 }
 
+function levenshteinDistance(a, b) {
+	const m = a.length;
+	const n = b.length;
+	if (!m) return n;
+	if (!n) return m;
+	let prev = new Array(n + 1);
+	let curr = new Array(n + 1);
+	for (let j = 0; j <= n; j++) prev[j] = j;
+	for (let i = 1; i <= m; i++) {
+		curr[0] = i;
+		for (let j = 1; j <= n; j++) {
+			const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+			curr[j] = Math.min(prev[j] + 1, curr[j - 1] + 1, prev[j - 1] + cost);
+		}
+		const swap = prev;
+		prev = curr;
+		curr = swap;
+	}
+	return prev[n];
+}
+
+// Suggest the closest command name/alias for a mistyped command.
+function findClosestCommandName(input) {
+	if (!input) return null;
+	const query = String(input).toLowerCase();
+	const commands = global.GoatBot.commands;
+	const aliases = global.GoatBot.aliases;
+	if (!commands) return null;
+	const candidates = new Set();
+	for (const name of commands.keys()) candidates.add(name);
+	if (aliases) for (const alias of aliases.keys()) candidates.add(alias);
+	let best = null;
+	let bestDistance = Infinity;
+	for (const candidate of candidates) {
+		if (candidate === query) return candidate;
+		const distance = levenshteinDistance(query, candidate);
+		if (distance < bestDistance) {
+			bestDistance = distance;
+			best = candidate;
+		}
+	}
+	const maxDistance = query.length <= 3 ? 1 : query.length <= 6 ? 2 : 3;
+	return bestDistance <= maxDistance ? best : null;
+}
+
+// Strip emoji variation selectors so "😠" and "😠️" compare equal.
+function normalizeReaction(value) {
+	return String(value || "").replace(/\uFE0F/g, "");
+}
+
+// Reactions can be delivered twice (Lightspeed table + mqtt delta) - dedupe.
+const recentReactionEvents = new Map();
+function isDuplicateReactionEvent(key) {
+	const now = Date.now();
+	const last = recentReactionEvents.get(key);
+	if (last && now - last < 4000)
+		return true;
+	recentReactionEvents.set(key, now);
+	if (recentReactionEvents.size > 500) {
+		for (const [k, t] of recentReactionEvents)
+			if (now - t > 4000)
+				recentReactionEvents.delete(k);
+	}
+	return false;
+}
+
 function getText(type, reason, time, targetID, lang) {
 	const utils = global.utils;
 	if (type == "userBanned")
@@ -213,40 +279,18 @@ module.exports = function (api, threadModel, userModel, dashBoardModel, globalMo
 		let isUserCallCommand = false;
 		async function onStart() {
 			// —————————————— CHECK USE BOT —————————————— //
-			const noPrefixConfig = config.noPrefix || { enable: false, onlyAdminBot: false, ignoreCommands: [] };
-			// A command is triggered either by the prefix or, when noPrefix is
-			// enabled, by typing the command name directly.
-			let usedNoPrefix = false;
-			if (!body || typeof body !== "string")
+			if (!body)
 				return;
-			if (body.startsWith(prefix)) {
-				// normal prefixed command
-			}
-			else if (noPrefixConfig.enable === true) {
-				// Only continue when the first word is an exact command/alias name,
-				// so ordinary messages are never mistaken for a command.
-				const firstWord = body.trim().split(/ +/)[0]?.toLowerCase();
-				const isKnownCommand = firstWord && (
-					GoatBot.commands.has(firstWord) ||
-					GoatBot.aliases.has(firstWord)
-				);
-				if (!isKnownCommand)
-					return;
-				if (noPrefixConfig.onlyAdminBot === true && role < 2)
-					return;
-				if (Array.isArray(noPrefixConfig.ignoreCommands) &&
-					noPrefixConfig.ignoreCommands.map(c => String(c).toLowerCase()).includes(firstWord))
-					return;
-				usedNoPrefix = true;
-			}
-			else {
+			const customFeatures = config.customFeatures || {};
+			const noPrefixEnabled = customFeatures.noPrefix?.enable == true && Number(role) === 2;
+			const hasPrefix = body.startsWith(prefix);
+			// No prefix and the noPrefix feature is off -> this is not a command.
+			if (!hasPrefix && !noPrefixEnabled)
 				return;
-			}
 			const dateNow = Date.now();
-			const commandPrefix = usedNoPrefix ? "" : prefix;
-			const args = (usedNoPrefix ? body : body.slice(prefix.length)).trim().split(/ +/);
+			const args = hasPrefix ? body.slice(prefix.length).trim().split(/ +/) : body.trim().split(/ +/);
 			// ————————————  CHECK HAS COMMAND ——————————— //
-			let commandName = args.shift().toLowerCase();
+			let commandName = (args.shift() || "").toLowerCase();
 			let command = GoatBot.commands.get(commandName) || GoatBot.commands.get(GoatBot.aliases.get(commandName));
 			// ———————— CHECK ALIASES SET BY GROUP ———————— //
 			const aliasesData = threadData.data.aliases || {};
@@ -256,6 +300,10 @@ module.exports = function (api, threadModel, userModel, dashBoardModel, globalMo
 					break;
 				}
 			}
+			// —— noPrefix: never treat normal messages as commands —— //
+			// Only an exact command name/alias (first word) runs; anything else is ignored silently.
+			if (!hasPrefix && !command)
+				return;
 			// ————————————— SET COMMAND NAME ————————————— //
 			if (command)
 				commandName = command.config.name;
@@ -272,29 +320,29 @@ module.exports = function (api, threadModel, userModel, dashBoardModel, globalMo
 					return body_.replace(new RegExp(`^${prefix_}(\\s+|)${commandName_}`, "i"), "").trim();
 				}
 				else {
-					return body.replace(new RegExp(`^${commandPrefix}(\\s+|)${commandName}`, "i"), "").trim();
+					const pattern = hasPrefix
+						? new RegExp(`^${prefix}(\\s+|)${commandName}`, "i")
+						: new RegExp(`^${commandName}(\\s+|)`, "i");
+					return body.replace(pattern, "").trim();
 				}
 			}
 			// —————  CHECK BANNED OR ONLY ADMIN BOX  ————— //
 			if (isBannedOrOnlyAdmin(userData, threadData, senderID, threadID, isGroup, commandName, message, langCode))
 				return;
-			if (!command)
-				if (!hideNotiMessage.commandNotFound) {
-					const suggestion = config.commandSuggestion?.enable
-						? utils.findClosestCommand(commandName, GoatBot.commands, GoatBot.aliases)
-						: null;
-					if (suggestion)
-						return await message.reply(
-							utils.getText({ lang: langCode, head: "handlerEvents" }, "commandNotFoundSuggestion", commandPrefix, commandName, `${commandPrefix}${suggestion.name}`)
-						);
-					return await message.reply(
-						commandName ?
-							utils.getText({ lang: langCode, head: "handlerEvents" }, "commandNotFound", commandName, prefix) :
-							utils.getText({ lang: langCode, head: "handlerEvents" }, "commandNotFound2", prefix)
-					);
-				}
-				else
+			if (!command) {
+				if (hideNotiMessage.commandNotFound)
 					return true;
+				// —————————— SUGGEST CLOSEST COMMAND —————————— //
+				const suggestionEnabled = customFeatures.commandSuggestion?.enable != false;
+				const suggestion = suggestionEnabled && commandName ? findClosestCommandName(commandName) : null;
+				if (suggestion)
+					return await message.reply(utils.getText({ lang: langCode, head: "handlerEvents" }, "commandNotFoundSuggest", prefix, suggestion));
+				return await message.reply(
+					commandName ?
+						utils.getText({ lang: langCode, head: "handlerEvents" }, "commandNotFound", commandName, prefix) :
+						utils.getText({ lang: langCode, head: "handlerEvents" }, "commandNotFound2", prefix)
+				);
+			}
 			// ————————————— CHECK PERMISSION ———————————— //
 			const roleConfig = getRoleConfig(utils, command, isGroup, threadData, commandName);
 			const needRole = roleConfig.onStart;
@@ -343,7 +391,6 @@ module.exports = function (api, threadModel, userModel, dashBoardModel, globalMo
 					args,
 					commandName,
 					getLang: getText2,
-					usedNoPrefix,
 					removeCommandNameFromBody
 				});
 				timestamps[senderID] = dateNow;
@@ -596,75 +643,69 @@ module.exports = function (api, threadModel, userModel, dashBoardModel, globalMo
 		 |                   ON REACTION                  |
 		 +------------------------------------------------+
 		*/
-		async function onReaction() {
-			// ————————— REACT-TO-UNSEND BOT MESSAGE ————————— //
-			// When an allowed user reacts to one of the bot's messages with a
-			// configured emoji (e.g. 😡/😠), unsend (delete) that message.
-			const reactUnsendConfig = config.reactUnsend;
-			let unsendHandled = false; // true only when we actually unsent a bot message
-			if (
-				reactUnsendConfig?.enable &&
-				Array.isArray(reactUnsendConfig.emojis) &&
-				reactUnsendConfig.emojis.includes(event.reaction)
-			) {
-				const allowed = reactUnsendConfig.onlyAdmin === false ? true : role >= 1;
-				if (allowed) {
-					const reactedMessageID = event.messageID;
-					// Only unsend messages that were actually sent by the bot;
-					// otherwise fall through so reactMirror can handle it.
-					const botMessages = global.temp?.messagesOfBot;
-					const isBotMessage = botMessages && typeof botMessages.has === "function"
-						? botMessages.has(String(reactedMessageID))
-						: true;
-					if (isBotMessage) {
-						try {
-							await api.unsendMessage(reactedMessageID, event.threadID);
-							botMessages?.delete?.(String(reactedMessageID));
-							log.info("REACT UNSEND", `Unsent bot message ${reactedMessageID} reacted by ${senderID} (${event.reaction})`);
-							unsendHandled = true;
-						}
-						catch (err) {
-							log.err("REACT UNSEND", `Could not unsend message ${reactedMessageID}: ${err.message}`);
-						}
-					}
-				}
-			}
-			if (unsendHandled)
+		// Config-driven reaction features (config.json -> customFeatures).
+		//   1. unsendOnReaction: admin (role 2) reacts with a configured emoji on a
+		//      message the bot sent -> the bot unsends it.
+		//   2. reactMirror: admin reacts with any emoji on someone else's message ->
+		//      the bot mirrors that emoji. Never on the bot's own messages.
+		async function handleCustomReaction() {
+			const customFeatures = config.customFeatures || {};
+			const unsendCfg = customFeatures.unsendOnReaction || {};
+			const mirrorCfg = customFeatures.reactMirror || {};
+			if (unsendCfg.enable != true && mirrorCfg.enable != true)
 				return;
 
-			// ————————— REACT-MIRROR ON SOMEONE'S MESSAGE ————————— //
-			// When an allowed user reacts to someone else's message, the bot
-			// mirrors the SAME reaction onto that message (the bot must be in
-			// the chat). By default every emoji is mirrored; disable
-			// mirrorAllEmojis to restrict it to the emojis list.
-			const reactMirrorConfig = config.reactMirror;
-			if (reactMirrorConfig?.enable && event.reaction) {
-				const mirrorAll = reactMirrorConfig.mirrorAllEmojis !== false;
-				const emojiAllowed = mirrorAll
-					|| (Array.isArray(reactMirrorConfig.emojis) && reactMirrorConfig.emojis.includes(event.reaction));
-				const allowed = reactMirrorConfig.onlyAdmin === false ? true : role >= 1;
-				// Ignore reactions coming from the bot itself to avoid loops.
-				const botID = typeof api.getCurrentUserID === "function" ? String(api.getCurrentUserID()) : null;
-				const fromBot = botID && String(senderID) === botID;
-				if (emojiAllowed && allowed && !fromBot) {
-					const mirroredMessageID = event.messageID;
-					const botMessages = global.temp?.messagesOfBot;
-					const isBotMessage = botMessages && typeof botMessages.has === "function"
-						? botMessages.has(String(mirroredMessageID))
-						: false;
-					// Mirror only on other people's messages, not the bot's own.
-					if (!isBotMessage) {
+			const botID = api.getCurrentUserID();
+			const reactor = event.senderID || event.userID;
+			const emoji = event.reaction;
+			const targetID = event.messageID;
+			// Ignore removed reactions, the bot's own reactions and non-admins.
+			if (!reactor || reactor == botID || !emoji || !targetID)
+				return;
+			if (Number(role) !== 2)
+				return;
+			if (isDuplicateReactionEvent(`${targetID}|${reactor}|${normalizeReaction(emoji)}`))
+				return;
+
+			const tracked = GoatBot.botSentMessages;
+			const isBotMessage = !!(tracked && tracked.has(targetID));
+
+			if (isBotMessage) {
+				if (unsendCfg.enable == true) {
+					const reactions = Array.isArray(unsendCfg.reactions) && unsendCfg.reactions.length
+						? unsendCfg.reactions.map(normalizeReaction)
+						: ["😠", "😡"];
+					if (reactions.includes(normalizeReaction(emoji))) {
 						try {
-							await api.setMessageReaction(event.reaction, mirroredMessageID, threadID);
-							return log.info("REACT MIRROR", `Mirrored ${event.reaction} to message ${mirroredMessageID} reacted by ${senderID}`);
+							await api.unsendMessage(targetID);
 						}
 						catch (err) {
-							return log.err("REACT MIRROR", `Could not mirror reaction to message ${mirroredMessageID}: ${err.message}`);
+							// Message may already be gone - ignore.
 						}
 					}
 				}
+				// Never mirror a reaction onto the bot's own message.
+				return;
 			}
 
+			if (mirrorCfg.enable == true) {
+				try {
+					await api.setMessageReaction(emoji, targetID, event.threadID);
+				}
+				catch (err) {
+					// Unknown thread / deleted message - ignore.
+				}
+			}
+		}
+
+		async function onReaction() {
+			// ————————— CUSTOM ADMIN REACTION FEATURES ————————— //
+			try {
+				await handleCustomReaction();
+			}
+			catch (err) {
+				log.err("CUSTOM_REACTION", "An error occurred while handling a custom reaction", err);
+			}
 			const { onReaction } = GoatBot;
 			const Reaction = onReaction.get(messageID);
 			if (!Reaction)

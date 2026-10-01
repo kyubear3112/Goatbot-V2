@@ -7,28 +7,15 @@ const { Server } = require("socket.io");
 const { log, getText } = global.utils;
 const { config } = global.GoatBot;
 
-function randomToken(length) {
-	const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-	let token = "";
-	for (let i = 0; i < length; i++)
-		token += chars.charAt(Math.floor(Math.random() * chars.length));
-	return token;
-}
-
 module.exports = async (server) => {
-	const socketConfig = config.serverUptime.socket;
-	const { channelName } = socketConfig;
-	let { verifyToken } = socketConfig;
+	const { channelName, verifyToken } = config.serverUptime.socket;
 	let io;
 
 	try {
 		if (!channelName)
 			throw ('"channelName" is not defined in config');
-		if (!verifyToken) {
-			verifyToken = socketConfig.verifyToken = randomToken(32);
-			log.warn("SOCKET IO", `"verifyToken" is not set in config, generated a temporary one: ${verifyToken}`);
-			log.warn("SOCKET IO", "Set serverUptime.socket.verifyToken in config.json to a fixed value so clients can reconnect.");
-		}
+		if (!verifyToken)
+			throw ('"verifyToken" is not defined in config');
 		io = new Server(server);
 		log.info("SOCKET IO", getText("socketIO", "connected"));
 	}
