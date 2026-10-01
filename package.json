@@ -31,7 +31,7 @@
 		"mime-db": "^1.54.0",
 		"moment-timezone": "^0.6.4",
 		"mongoose": "^8.19.1",
-		"neokex-fca": "^5.0.2",
+		"neokex-fca": "^5.0.3",
 		"node-cron": "^4.6.0",
 		"nodemailer": "^10.0.13",
 		"ora": "^5.4.1",
