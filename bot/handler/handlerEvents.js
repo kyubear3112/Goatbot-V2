@@ -234,8 +234,10 @@ module.exports = function (api, threadModel, userModel, dashBoardModel, globalMo
 			global.db.receivedTheFirstMessage[threadID] = true;
 		}
 		else {
+			const isMessageEvent = event.type === "message" || event.type === "message_reply";
 			if (
 				autoRefreshThreadInfoFirstTime === true
+				&& isMessageEvent
 				&& !global.db.receivedTheFirstMessage[threadID]
 			) {
 				global.db.receivedTheFirstMessage[threadID] = true;
