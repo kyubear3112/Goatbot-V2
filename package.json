@@ -44,7 +44,8 @@
 		"sequelize": "^6.37.8",
 		"socket.io": "^4.8.4",
 		"sqlite3": "^5.1.7",
-		"totp-generator": "^0.0.13"
+		"totp-generator": "^0.0.13",
+		"ws": "^8.18.0"
 	},
 	"scripts": {
 		"start": "node index.js",
