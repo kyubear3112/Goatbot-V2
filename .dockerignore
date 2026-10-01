@@ -1,0 +1,16 @@
+node_modules
+npm-debug.log*
+yarn-error.log*
+.git
+.gitignore
+.vscode
+.replit
+replit.nix
+*.zip
+*.rar
+database/data/*.sqlite
+database/data/*.sqlite-*
+scripts/cmds/tmp/*
+!scripts/cmds/tmp/.gitkeep
+scripts/events/tmp/*
+!scripts/events/tmp/.gitkeep

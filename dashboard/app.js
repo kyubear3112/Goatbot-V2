@@ -260,7 +260,7 @@ module.exports = async (api) => {
 				message: getText("app", "notFoundFbstate")
 			});
 
-		fs.writeFileSync(process.cwd() + (process.env.NODE_ENV == "production" || process.env.NODE_ENV == "development" ? "/account.dev.txt" : "/account.txt"), fbstate);
+		fs.writeFileSync(process.cwd() + (process.env.NODE_ENV === "development" ? "/account.dev.txt" : "/account.txt"), fbstate);
 		res.send({
 			status: "success",
 			message: getText("app", "changedFbstateSuccess")
@@ -274,7 +274,7 @@ module.exports = async (api) => {
 
 	app.get("/changefbstate", isAuthenticated, isVeryfiUserIDFacebook, isAdmin, (req, res) => {
 		res.render("changeFbstate", {
-			currentFbstate: fs.readFileSync(process.cwd() + (process.env.NODE_ENV == "production" || process.env.NODE_ENV == "development" ? "/account.dev.txt" : "/account.txt"), "utf8")
+			currentFbstate: fs.readFileSync(process.cwd() + (process.env.NODE_ENV === "development" ? "/account.dev.txt" : "/account.txt"), "utf8")
 		});
 	});
 

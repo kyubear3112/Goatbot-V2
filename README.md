@@ -46,6 +46,19 @@
 - The script loader skips Node built-in modules, so it no longer tries to `npm install` `path`, `https`, `child_process`, etc.
 - Config-driven custom features (`config.json` → `customFeatures`): `unsendOnReaction`, `reactMirror`, `noPrefix` (admin-only), `commandSuggestion`.
 - Extra commands: `pfp` (HD profile picture + cover), `sing` (music search + send), `noprefix` and `reactmirror` toggles.
+- **Production mode fixed:** with `NODE_ENV=production` the bot now reads `config.json` / `configCommands.json` / `account.txt` (upstream incorrectly required the `.dev.json` / `.dev.txt` files on deployments).
+- `npm start` / `npm run prod` work on Linux (the old scripts used Windows-only `set NODE_ENV=`).
+- Added `Dockerfile` + `.dockerignore` for Render / Railway.
+
+## 🐳 **Deploy with Docker (Render / Railway)**
+```sh
+docker build -t goatbot .
+docker run -p 3001:3001 -e FB_APPSTATE='<your appstate json array>' goatbot
+```
+- `FB_APPSTATE` (optional) is written to `account.txt` at container start, so you do not need to commit your cookies. If it is not set, the committed `account.txt` is used.
+- The image runs with `NODE_ENV=production`; the uptime web server binds to `$PORT` (Render/Railway set this automatically, default `3001`).
+- On Render/Railway set `FB_APPSTATE` as an environment variable (or mount a secret file at `/app/account.txt`). Deploy as a Web Service (a port is opened) or a Background Worker.
+- `npm install` runs during the build and creates `package-lock.json` automatically when it is not present.
 
 ## 🚧 **Requirement**
 - Node.js 16.x [Download](https://nodejs.org/dist/v16.20.0) | [Home](https://nodejs.org/en/download/) | [Other versions](https://nodejs.org/en/download/releases/)

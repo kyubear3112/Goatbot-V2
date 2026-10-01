@@ -47,9 +47,9 @@
 		"totp-generator": "^0.0.13"
 	},
 	"scripts": {
-		"start": "set NODE_ENV=&& node index.js",
-		"dev": "set NODE_ENV=development&& node index.js",
-		"prod": "set NODE_ENV=production&& node index.js"
+		"start": "node index.js",
+		"dev": "NODE_ENV=development node index.js",
+		"prod": "NODE_ENV=production node index.js"
 	},
 	"author": "NTKhang (original) | Modified and enhanced by Saifullah Neoaz (@lazyneoaz)",
 	"license": "MIT",

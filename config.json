@@ -57,10 +57,10 @@
     "port": 3001
   },
   "serverUptime": {
-    "enable": false,
+    "enable": true,
     "port": 3001,
     "socket": {
-      "enable": true,
+      "enable": false,
       "channelName": "uptime",
       "verifyToken": ""
     }
